@@ -1,0 +1,25 @@
+split crawler & indexer into two processes
+
+CRAWLER:
+allowed_hostnames : list
+explored_sites : list
+queue : list
+
+url = first item in queue
+contents = fetch contents of url
+hyperlinks = find all hyperlinks in contents
+
+for each hyperlink:
+    if links to site outside of allowed hostnames:
+        skip
+    if already in queue:
+        skip
+    if links to explored site:
+        skip
+    if links to a variation of an already explored site:
+        skip
+
+    add to queue
+
+add url to explored sites
+remove from queue
