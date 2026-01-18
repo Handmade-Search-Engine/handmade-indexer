@@ -5,6 +5,10 @@ allowed_hostnames : list
 explored_sites : list
 queue : list
 
+fetch allowed hostnames from db
+fetch explored_sites from db
+fetch queue from db
+
 url = first item in queue
 contents = fetch contents of url
 hyperlinks = find all hyperlinks in contents
