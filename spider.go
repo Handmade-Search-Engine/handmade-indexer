@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -13,6 +15,11 @@ type AllowedHostname struct {
 	ID        int    `json:"id"`
 	URL       string `json:"url"`
 	Timestamp string `json:"created_at"`
+}
+
+type Queue struct {
+	ID  int    `json:"id"`
+	URL string `json:"url"`
 }
 
 func main() {
@@ -35,4 +42,20 @@ func main() {
 		panic(err)
 	}
 	fmt.Println(allowedHostnames)
+
+	queue := []Queue{}
+	_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(queue)
+
+	currentURL := queue[0]
+	resp, err := http.Get(currentURL.URL)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	fmt.Println(string(body))
 }
