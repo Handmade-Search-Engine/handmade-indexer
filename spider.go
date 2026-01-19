@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -71,6 +72,19 @@ func main() {
 			panic(err)
 		}
 		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			panic("status code error: " + strconv.Itoa(resp.StatusCode) + resp.Status)
+		}
+
+		println(currentURL.String())
+		println(resp.ContentLength)
+
+		if resp.ContentLength > -1 {
+			println("SKIPPING")
+			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			continue
+		}
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
 			panic(err)
