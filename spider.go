@@ -71,6 +71,19 @@ func main() {
 			panic(err)
 		}
 		defer resp.Body.Close()
+
+		println(currentURL.String())
+		if resp.StatusCode != 200 {
+			println("Error loading page: " + resp.Status)
+			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			continue
+		}
+
+		if resp.Header.Get("Content-Type") != "text/html" {
+			println("Attempting to Parse Non-Text Page -- Skipping")
+			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			continue
+		}
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
 			panic(err)
