@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/joho/godotenv"
 	"github.com/supabase-community/supabase-go"
 )
@@ -56,6 +56,9 @@ func main() {
 		panic(err)
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	fmt.Println(string(body))
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	doc.Find("a").Each(func(i int, s *goquery.Selection) {
+		fmt.Println(s.Attr("href"))
+	})
+	fmt.Println(doc.Children())
 }
