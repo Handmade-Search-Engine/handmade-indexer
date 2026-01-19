@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -17,6 +18,12 @@ type AllowedHostname struct {
 	ID        int    `json:"id"`
 	URL       string `json:"url"`
 	Timestamp string `json:"created_at"`
+}
+
+type KnownPage struct {
+	ID       int    `json:"id"`
+	URL      string `json:"url"`
+	Contents string `json:"contents"`
 }
 
 type Queue struct {
@@ -38,13 +45,18 @@ func main() {
 		fmt.Println("Failed to initalize the client: ", err)
 	}
 
-	allowedHostnames := []AllowedHostname{}
-	_, err = client.From("allowed_hostnames").Select("*", "", false).ExecuteTo(&allowedHostnames)
+	allowedHostnameObjects := []AllowedHostname{}
+	_, err = client.From("allowed_hostnames").Select("*", "", false).ExecuteTo(&allowedHostnameObjects)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(allowedHostnames)
 
+	allowedHostnames := []string{}
+	for i := 0; i < len(allowedHostnameObjects); i++ {
+		allowedHostnames = append(allowedHostnames, allowedHostnameObjects[i].URL)
+	}
+
+	
 	queue := []Queue{}
 	_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
 	if err != nil {
@@ -56,6 +68,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	println(currentURL)
 
 	resp, err := http.Get(currentURL.String())
 	if err != nil {
@@ -81,5 +94,55 @@ func main() {
 			newLinks = append(newLinks, "https://"+hostname+"/"+hyperlink)
 		}
 	})
-	fmt.Println(newLinks)
+
+	stringQueue := []string{}
+	for i := 0; i < len(queue); i++ {
+		stringQueue = append(stringQueue, queue[i].URL)
+	}
+
+	knownPages := []KnownPage{}
+	_, err = client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
+	if err != nil {
+		panic(err)
+	}
+
+	knownURLs := []string{}
+	for i := 0; i < len(knownPages); i++ {
+		knownURLs = append(knownURLs, knownPages[i].URL)
+	}
+
+	for i := 0; i < len(newLinks); i++ {
+		hyperlink, err := url.Parse(newLinks[i])
+		if err != nil {
+			panic(err)
+		}
+
+		if slices.Contains(allowedHostnames, hyperlink.Hostname()) == false {
+			println("Not in allowed hostnames")
+			continue
+		}
+		if slices.Contains(stringQueue, hyperlink.String()) == true {
+			println("Already in queue")
+			continue
+		}
+		if slices.Contains(knownURLs, hyperlink.String()) == true {
+			println("Already in found")
+			continue
+		}
+		println(hyperlink.String())
+		_, _, err = client.From("queue").Insert(map[string]interface{}{"url": hyperlink.String()}, false, "", "", "").Execute()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	_, _, err = client.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String(), "contents": doc.Text()}, false, "", "", "").Execute()
+	if err != nil {
+		panic(err)
+	}
+
+	_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+	if err != nil {
+		panic(err)
+	}
 }
