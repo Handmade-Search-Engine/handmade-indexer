@@ -43,7 +43,7 @@ while True:
         break
 
     url = urlparse(queue[0]['url'])
-    print(url.geturl())
+    print(len(queue), ":", url.geturl())
     hostname = url.hostname
 
     soup = get_soup(url.geturl())
@@ -94,6 +94,7 @@ while True:
         supabase.table('keywords')
         .select('keyword_id', 'keyword')
         .in_('keyword', words)
+        .limit(len(keywords.keys()))
         .execute()
     ).data
 
@@ -101,6 +102,8 @@ while True:
         row['keyword']: row['keyword_id']
         for row in keyword_rows
     }
+
+    print(len(keyword_id_map.keys()))
 
     posting_rows = []
     for word, positions in keywords.items():

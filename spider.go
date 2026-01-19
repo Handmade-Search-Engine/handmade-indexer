@@ -56,7 +56,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println(queue)
 
 		if len(queue) == 0 {
 			break
@@ -66,7 +65,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		println(currentURL)
 
 		resp, err := http.Get(currentURL.String())
 		if err != nil {
@@ -79,6 +77,8 @@ func main() {
 		}
 
 		hostname := currentURL.Hostname()
+		println(currentURL.String())
+
 		newLinks := []string{}
 		doc.Find("a").Each(func(i int, s *goquery.Selection) {
 			hyperlink, exists := s.Attr("href")
@@ -99,9 +99,11 @@ func main() {
 		}
 
 		knownPages := []Site{}
-		_, err = client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
-		if err != nil {
-			panic(err)
+		if len(newLinks) > 0 {
+			_, err := client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
+			if err != nil {
+				panic(err)
+			}
 		}
 
 		knownURLs := []string{}
@@ -113,6 +115,16 @@ func main() {
 			hyperlink, err := url.Parse(newLinks[i])
 			if err != nil {
 				panic(err)
+			}
+
+			if len(hyperlink.Fragment) > 0 {
+				println("Points to Fragment")
+				continue
+			}
+
+			if strings.HasSuffix(hyperlink.String(), ".xml") == true {
+				println("Is an XML file")
+				continue
 			}
 
 			if slices.Contains(allowedHostnames, hyperlink.Hostname()) == false {
