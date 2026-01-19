@@ -6,7 +6,7 @@ CRAWLER:
 
 ✅ fetch allowed hostnames from db
 
-repeat until queue is empty:
+✅ repeat until queue is empty:
 ✅ fetch queue from db
 
 ✅ url = first item in queue

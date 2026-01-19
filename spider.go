@@ -56,93 +56,99 @@ func main() {
 		allowedHostnames = append(allowedHostnames, allowedHostnameObjects[i].URL)
 	}
 
-	
-	queue := []Queue{}
-	_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println(queue)
-
-	currentURL, err := url.Parse(queue[0].URL)
-	if err != nil {
-		panic(err)
-	}
-	println(currentURL)
-
-	resp, err := http.Get(currentURL.String())
-	if err != nil {
-		panic(err)
-	}
-	defer resp.Body.Close()
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	hostname := currentURL.Hostname()
-	newLinks := []string{}
-	doc.Find("a").Each(func(i int, s *goquery.Selection) {
-		hyperlink, exists := s.Attr("href")
-		if exists == false {
-			return
-		} else if strings.HasPrefix(hyperlink, "https://") {
-			newLinks = append(newLinks, hyperlink)
-		} else if strings.HasPrefix(hyperlink, "/") {
-			newLinks = append(newLinks, "https://"+hostname+hyperlink)
-		} else {
-			newLinks = append(newLinks, "https://"+hostname+"/"+hyperlink)
+	for true {
+		queue := []Queue{}
+		_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
+		if err != nil {
+			panic(err)
 		}
-	})
+		fmt.Println(queue)
 
-	stringQueue := []string{}
-	for i := 0; i < len(queue); i++ {
-		stringQueue = append(stringQueue, queue[i].URL)
-	}
+		if len(queue) == 0 {
+			break
+		}
 
-	knownPages := []KnownPage{}
-	_, err = client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
-	if err != nil {
-		panic(err)
-	}
+		currentURL, err := url.Parse(queue[0].URL)
+		if err != nil {
+			panic(err)
+		}
+		println(currentURL)
 
-	knownURLs := []string{}
-	for i := 0; i < len(knownPages); i++ {
-		knownURLs = append(knownURLs, knownPages[i].URL)
-	}
-
-	for i := 0; i < len(newLinks); i++ {
-		hyperlink, err := url.Parse(newLinks[i])
+		resp, err := http.Get(currentURL.String())
+		if err != nil {
+			panic(err)
+		}
+		defer resp.Body.Close()
+		doc, err := goquery.NewDocumentFromReader(resp.Body)
 		if err != nil {
 			panic(err)
 		}
 
-		if slices.Contains(allowedHostnames, hyperlink.Hostname()) == false {
-			println("Not in allowed hostnames")
-			continue
+		hostname := currentURL.Hostname()
+		newLinks := []string{}
+		doc.Find("a").Each(func(i int, s *goquery.Selection) {
+			hyperlink, exists := s.Attr("href")
+			if exists == false {
+				return
+			} else if strings.HasPrefix(hyperlink, "https://") {
+				newLinks = append(newLinks, hyperlink)
+			} else if strings.HasPrefix(hyperlink, "/") {
+				newLinks = append(newLinks, "https://"+hostname+hyperlink)
+			} else {
+				newLinks = append(newLinks, "https://"+hostname+"/"+hyperlink)
+			}
+		})
+
+		stringQueue := []string{}
+		for i := 0; i < len(queue); i++ {
+			stringQueue = append(stringQueue, queue[i].URL)
 		}
-		if slices.Contains(stringQueue, hyperlink.String()) == true {
-			println("Already in queue")
-			continue
+
+		knownPages := []KnownPage{}
+		_, err = client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
+		if err != nil {
+			panic(err)
 		}
-		if slices.Contains(knownURLs, hyperlink.String()) == true {
-			println("Already in found")
-			continue
+
+		knownURLs := []string{}
+		for i := 0; i < len(knownPages); i++ {
+			knownURLs = append(knownURLs, knownPages[i].URL)
 		}
-		println(hyperlink.String())
-		_, _, err = client.From("queue").Insert(map[string]interface{}{"url": hyperlink.String()}, false, "", "", "").Execute()
+
+		for i := 0; i < len(newLinks); i++ {
+			hyperlink, err := url.Parse(newLinks[i])
+			if err != nil {
+				panic(err)
+			}
+
+			if slices.Contains(allowedHostnames, hyperlink.Hostname()) == false {
+				println("Not in allowed hostnames")
+				continue
+			}
+			if slices.Contains(stringQueue, hyperlink.String()) == true {
+				println("Already in queue")
+				continue
+			}
+			if slices.Contains(knownURLs, hyperlink.String()) == true {
+				println("Already in found")
+				continue
+			}
+			println(hyperlink.String())
+			_, _, err = client.From("queue").Insert(map[string]interface{}{"url": hyperlink.String()}, false, "", "", "").Execute()
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		_, _, err = client.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String(), "contents": doc.Text()}, false, "", "", "").Execute()
+		if err != nil {
+			panic(err)
+		}
+
+		_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 		if err != nil {
 			panic(err)
 		}
 	}
 
-	_, _, err = client.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String(), "contents": doc.Text()}, false, "", "", "").Execute()
-	if err != nil {
-		panic(err)
-	}
-
-	_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
-	if err != nil {
-		panic(err)
-	}
 }
