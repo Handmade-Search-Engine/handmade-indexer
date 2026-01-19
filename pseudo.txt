@@ -12,10 +12,10 @@ CRAWLER:
 ✅ html = parse html from page
 ✅ hyperlinks = find all hyperlinks in contents
 
-format each hyperlink into a full link
-if starts with https:// then it is good
-otherwise, if starts with / append to hostname
-otherwise, add / and append to hostname
+✅ format each hyperlink into a full link
+✅ if starts with https:// then it is good
+✅ otherwise, if starts with / append to hostname
+✅ otherwise, add / and append to hostname
 
 known pages = fetch all urls from known index that are also in the hyperlinks
 

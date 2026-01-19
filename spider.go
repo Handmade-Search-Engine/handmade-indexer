@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/joho/godotenv"
@@ -50,15 +52,34 @@ func main() {
 	}
 	fmt.Println(queue)
 
-	currentURL := queue[0]
-	resp, err := http.Get(currentURL.URL)
+	currentURL, err := url.Parse(queue[0].URL)
+	if err != nil {
+		panic(err)
+	}
+
+	resp, err := http.Get(currentURL.String())
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	hostname := currentURL.Hostname()
+	newLinks := []string{}
 	doc.Find("a").Each(func(i int, s *goquery.Selection) {
-		fmt.Println(s.Attr("href"))
+		hyperlink, exists := s.Attr("href")
+		if exists == false {
+			return
+		} else if strings.HasPrefix(hyperlink, "https://") {
+			newLinks = append(newLinks, hyperlink)
+		} else if strings.HasPrefix(hyperlink, "/") {
+			newLinks = append(newLinks, "https://"+hostname+hyperlink)
+		} else {
+			newLinks = append(newLinks, "https://"+hostname+"/"+hyperlink)
+		}
 	})
-	fmt.Println(doc.Children())
+	fmt.Println(newLinks)
 }
