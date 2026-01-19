@@ -1,0 +1,37 @@
+split crawler & indexer into two processes
+
+CRAWLER:
+✅ allowed_hostnames : list
+✅ queue: list
+
+✅ fetch allowed hostnames from db
+
+✅ repeat until queue is empty:
+✅ fetch queue from db
+
+✅ url = first item in queue
+✅ contents = fetch contents of url
+✅ html = parse html from page
+✅ hyperlinks = find all hyperlinks in contents
+
+✅ format each hyperlink into a full link
+✅ if starts with https:// then it is good
+✅ otherwise, if starts with / append to hostname
+✅ otherwise, add / and append to hostname
+
+✅ known pages = fetch all urls from known index that are also in the hyperlinks
+
+✅ for each hyperlink:
+✅    if links to page outside of allowed hostnames:
+✅        skip
+✅    if already in queue:
+✅        skip
+✅    if links to a known page:
+✅        skip
+✅    if links to a variation of a known page:
+✅        skip
+
+✅    add to queue
+
+✅ add url to known pages db
+✅ url remove from queue
