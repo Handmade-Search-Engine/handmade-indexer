@@ -20,13 +20,7 @@ type AllowedHostname struct {
 	Timestamp string `json:"created_at"`
 }
 
-type KnownPage struct {
-	ID       int    `json:"id"`
-	URL      string `json:"url"`
-	Contents string `json:"contents"`
-}
-
-type Queue struct {
+type Site struct {
 	ID  int    `json:"id"`
 	URL string `json:"url"`
 }
@@ -57,7 +51,7 @@ func main() {
 	}
 
 	for true {
-		queue := []Queue{}
+		queue := []Site{}
 		_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
 		if err != nil {
 			panic(err)
@@ -104,7 +98,7 @@ func main() {
 			stringQueue = append(stringQueue, queue[i].URL)
 		}
 
-		knownPages := []KnownPage{}
+		knownPages := []Site{}
 		_, err = client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
 		if err != nil {
 			panic(err)
@@ -140,7 +134,7 @@ func main() {
 			}
 		}
 
-		_, _, err = client.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String(), "contents": doc.Text()}, false, "", "", "").Execute()
+		_, _, err = client.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String()}, false, "", "", "").Execute()
 		if err != nil {
 			panic(err)
 		}
@@ -150,5 +144,4 @@ func main() {
 			panic(err)
 		}
 	}
-
 }
