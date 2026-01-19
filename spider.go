@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -73,15 +72,15 @@ func main() {
 		}
 		defer resp.Body.Close()
 
+		println(currentURL.String())
 		if resp.StatusCode != 200 {
-			panic("status code error: " + strconv.Itoa(resp.StatusCode) + resp.Status)
+			println("Error loading page: " + resp.Status)
+			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			continue
 		}
 
-		println(currentURL.String())
-		println(resp.ContentLength)
-
-		if resp.ContentLength > -1 {
-			println("SKIPPING")
+		if resp.Header.Get("Content-Type") == "image/png" {
+			println("Attempting to Parse Image -- Skipping")
 			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
