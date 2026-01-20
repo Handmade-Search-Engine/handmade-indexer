@@ -36,6 +36,8 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(url, key)
 
+previous_hostname = ""
+previous_hostname_soup = None
 
 while True:
     queue = supabase.table('known_pages').select("*").execute().data
@@ -48,10 +50,23 @@ while True:
 
     soup = get_soup(url.geturl())
     keywords = get_keywords(soup.get_text("\n"))
+        
+    hostname_soup = previous_hostname_soup
+    if hostname != previous_hostname:
+        hostname_soup = get_soup('https://'+hostname)
+
+    title = ""
+    if soup.title:
+        title = soup.title.contents[0]
+        if hostname_soup.title:
+            if title == hostname_soup.title.contents[0]:
+                header = soup.find('h1')
+                if header:
+                    title = header.contents[0]
 
     res = (
         supabase.table("sites")
-           .insert({"url": url.geturl(), "doc_length": len(keywords)})
+           .upsert({"url": url.geturl(), "doc_length": len(keywords), "title": title}, on_conflict="url")
            .execute()
         )
     site_id = res.data[0]['site_id']
@@ -116,9 +131,11 @@ while True:
 
     response = (
             supabase.table("postings")
-            .insert(posting_rows)
+            .upsert(posting_rows)
             .execute()
         )
     
     supabase.table('known_pages').delete().eq("url", url.geturl()).execute()
+    previous_hostname = hostname
+    previous_hostname_soup = hostname_soup
     print(queue)
