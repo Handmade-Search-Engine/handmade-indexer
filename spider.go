@@ -50,6 +50,8 @@ func main() {
 		allowedHostnames = append(allowedHostnames, allowedHostnameObjects[i].URL)
 	}
 
+	httpClient := &http.Client{}
+
 	for true {
 		queue := []Site{}
 		_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
@@ -66,7 +68,13 @@ func main() {
 			panic(err)
 		}
 
-		resp, err := http.Get(currentURL.String())
+		request, err := http.NewRequest("GET", currentURL.String(), nil)
+		if err != nil {
+			panic(err)
+		}
+		request.Header.Set("User-Agent", "Handmade_Web_Crawler")
+
+		resp, err := httpClient.Do(request)
 		if err != nil {
 			panic(err)
 		}
