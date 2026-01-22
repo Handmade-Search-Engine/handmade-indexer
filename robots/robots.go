@@ -11,7 +11,9 @@ User-agent: *
 Content-Signal: ai-train=no, search=yes, ai-input=no
 Allow: /
 `
-	parse(example)
+	robots := parse(example)
+	println(len(robots.agentRules))
+	println(robots.agentRules["*"].contentSignal.aiInput)
 }
 
 type ContentSignal struct {
@@ -78,9 +80,34 @@ func parse(text string) Robots {
 			rules.crawlDelay = crawlDelay
 			continue
 		}
+		if strings.HasPrefix(strings.ToLower(lines[i]), "content-signal") {
+			signalString := extractValue(lines[i])
+			signals := strings.Split(signalString, ",")
+			for i := 0; i < len(signals); i++ {
+				signal := strings.TrimSpace(signals[i])
+				result := strings.SplitN(signal, "=", 2)
+				signalName := result[0]
+
+				signalValueString := result[1]
+				signalValue := false
+				if signalValueString == "yes" {
+					signalValue = true
+				}
+
+				switch signalName {
+				case "ai-input":
+					rules.contentSignal.aiInput = signalValue
+				case "ai-train":
+					rules.contentSignal.aiTrain = signalValue
+				case "search":
+					rules.contentSignal.search = signalValue
+				}
+			}
+			continue
+		}
 		println(lines[i])
 	}
-	return Robots{}
+	return robots
 }
 
 func extractValue(line string) string {
