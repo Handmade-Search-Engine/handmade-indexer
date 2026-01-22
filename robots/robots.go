@@ -13,19 +13,14 @@ Allow: /
 `
 	robots := parse(example)
 	println(len(robots.agentRules))
-	println(robots.agentRules["*"].contentSignal.aiInput)
+	println(robots.agentRules["FacebookBot"].disallow[0])
 }
 
-type ContentSignal struct {
-	aiInput bool
-	aiTrain bool
-	search  bool
-}
 type UserAgent struct {
 	allow         []string
 	disallow      []string
 	crawlDelay    int
-	contentSignal ContentSignal
+	contentSignal map[string]bool
 }
 type Robots struct {
 	agentRules map[string]UserAgent
@@ -94,15 +89,13 @@ func parse(text string) Robots {
 					signalValue = true
 				}
 
-				switch signalName {
-				case "ai-input":
-					rules.contentSignal.aiInput = signalValue
-				case "ai-train":
-					rules.contentSignal.aiTrain = signalValue
-				case "search":
-					rules.contentSignal.search = signalValue
-				}
+				rules.contentSignal[signalName] = signalValue
 			}
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(lines[i]), "sitemap") {
+			sitemap := extractValue(lines[i])
+			robots.sitemap = sitemap
 			continue
 		}
 		println(lines[i])
