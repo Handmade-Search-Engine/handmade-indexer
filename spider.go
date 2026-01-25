@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,6 +26,47 @@ type Site struct {
 	URL string `json:"url"`
 }
 
+func createHTTPRequest(url string) *http.Request {
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		panic(err)
+	}
+	request.Header.Set("User-Agent", "Handmade_Web_Crawler")
+	return request
+}
+
+func getRobots(hostname string) (bool, Robots) {
+	httpClient := &http.Client{}
+
+	url := "https://" + hostname + "/robots.txt"
+	request := createHTTPRequest(url)
+
+	_, err := net.LookupHost(hostname)
+	if err != nil {
+		println(hostname + " does not exist")
+		return false, Robots{}
+	}
+
+	resp, err := httpClient.Do(request)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		println("Error loading page: " + resp.Status)
+		return false, Robots{}
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	robots := parseRobots(doc.Text())
+	return true, robots
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -34,13 +76,13 @@ func main() {
 	supabaseURL := os.Getenv("SUPABASE_URL")
 	supabaseKey := os.Getenv("SUPABASE_KEY")
 
-	client, err := supabase.NewClient(supabaseURL, supabaseKey, &supabase.ClientOptions{})
+	supabaseClient, err := supabase.NewClient(supabaseURL, supabaseKey, &supabase.ClientOptions{})
 	if err != nil {
 		fmt.Println("Failed to initalize the client: ", err)
 	}
 
 	allowedHostnameObjects := []AllowedHostname{}
-	_, err = client.From("allowed_hostnames").Select("*", "", false).ExecuteTo(&allowedHostnameObjects)
+	_, err = supabaseClient.From("allowed_hostnames").Select("*", "", false).ExecuteTo(&allowedHostnameObjects)
 	if err != nil {
 		panic(err)
 	}
@@ -54,7 +96,7 @@ func main() {
 
 	for true {
 		queue := []Site{}
-		_, err = client.From("queue").Select("*", "", false).ExecuteTo(&queue)
+		_, err = supabaseClient.From("queue").Select("*", "", false).ExecuteTo(&queue)
 		if err != nil {
 			panic(err)
 		}
@@ -68,11 +110,7 @@ func main() {
 			panic(err)
 		}
 
-		request, err := http.NewRequest("GET", currentURL.String(), nil)
-		if err != nil {
-			panic(err)
-		}
-		request.Header.Set("User-Agent", "Handmade_Web_Crawler")
+		request := createHTTPRequest(currentURL.String())
 
 		resp, err := httpClient.Do(request)
 		if err != nil {
@@ -82,13 +120,13 @@ func main() {
 
 		if resp.StatusCode != 200 {
 			println("Error loading page: " + resp.Status)
-			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
 
 		if strings.Contains(resp.Header.Get("Content-Type"), "text/html") == false {
 			println("Attempting to Parse Non-Text Page -- Skipping")
-			_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
 		doc, err := goquery.NewDocumentFromReader(resp.Body)
@@ -120,7 +158,7 @@ func main() {
 
 		knownPages := []Site{}
 		if len(newLinks) > 0 {
-			_, err := client.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
+			_, err := supabaseClient.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
 			if err != nil {
 				panic(err)
 			}
@@ -149,6 +187,12 @@ func main() {
 
 			if slices.Contains(allowedHostnames, hyperlink.Hostname()) == false {
 				println("Not in allowed hostnames")
+				hasRobots, _ := getRobots(hyperlink.Hostname())
+				if hasRobots == false {
+					continue
+				}
+
+				_, _, err = supabaseClient.From("has_robots").Upsert(map[string]interface{}{"hostname": hyperlink.Hostname()}, "hostname", "", "").Execute()
 				continue
 			}
 			if slices.Contains(stringQueue, hyperlink.String()) == true {
@@ -160,18 +204,18 @@ func main() {
 				continue
 			}
 			println(hyperlink.String())
-			_, _, err = client.From("queue").Insert(map[string]interface{}{"url": hyperlink.String()}, false, "", "", "").Execute()
+			_, _, err = supabaseClient.From("queue").Insert(map[string]interface{}{"url": hyperlink.String()}, false, "", "", "").Execute()
 			if err != nil {
 				panic(err)
 			}
 		}
 
-		_, _, err = client.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String()}, false, "", "", "").Execute()
+		_, _, err = supabaseClient.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String()}, false, "", "", "").Execute()
 		if err != nil {
 			panic(err)
 		}
 
-		_, _, err = client.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+		_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 		if err != nil {
 			panic(err)
 		}

@@ -16,12 +16,13 @@ type Robots struct {
 	sitemap    string
 }
 
- func parseRobots(text string) Robots {
+func parseRobots(text string) Robots {
 	lines := strings.Split(text, "\n")
 	robots := Robots{}
 	robots.agentRules = make(map[string]UserAgent)
 	names := []string{}
 	rules := UserAgent{}
+	rules.contentSignal = make(map[string]bool)
 	for i := 0; i < len(lines); i++ {
 		if strings.HasPrefix(lines[i], "#") {
 			continue
