@@ -16,11 +16,11 @@ import (
 	"github.com/supabase-community/supabase-go"
 )
 
-type AllowedHostname struct {
-	ID        int    `json:"id"`
-	URL       string `json:"url"`
-	Timestamp string `json:"created_at"`
-}
+//type ApprovedHostname struct {
+//	ID        int    `json:"id"`
+//	URL       string `json:"url"`
+//	Timestamp string `json:"created_at"`
+//}
 
 type Site struct {
 	ID  int    `json:"id"`
@@ -70,6 +70,21 @@ func getRobots(hostname string) (bool, Robots) {
 	return true, robots
 }
 
+func getURLsFromTable(tableName string, client *supabase.Client) []string {
+	sites := []Site{}
+	_, err := client.From(tableName).Select("*", "", false).ExecuteTo(&sites)
+	if err != nil {
+		panic(err)
+	}
+
+	urls := []string{}
+	for i := 0; i < len(sites); i++ {
+		urls = append(urls, sites[i].URL)
+	}
+
+	return urls
+}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -84,16 +99,8 @@ func main() {
 		fmt.Println("Failed to initalize the client: ", err)
 	}
 
-	allowedHostnameObjects := []AllowedHostname{}
-	_, err = supabaseClient.From("allowed_hostnames").Select("*", "", false).ExecuteTo(&allowedHostnameObjects)
-	if err != nil {
-		panic(err)
-	}
-
-	allowedHostnames := []string{}
-	for i := 0; i < len(allowedHostnameObjects); i++ {
-		allowedHostnames = append(allowedHostnames, allowedHostnameObjects[i].URL)
-	}
+	approvedHostnames := getURLsFromTable("approved_hostnames", supabaseClient)
+	bannedHostnames := getURLsFromTable("banned_hostnames", supabaseClient)
 
 	httpClient := &http.Client{}
 
@@ -209,7 +216,12 @@ func main() {
 				continue
 			}
 
-			if slices.Contains(allowedHostnames, hyperlink.Hostname()) == false {
+			if slices.Contains(bannedHostnames, hyperlink.Hostname()) == true {
+				println(hyperlink.Hostname() + " is banned")
+				continue
+			}
+
+			if slices.Contains(approvedHostnames, hyperlink.Hostname()) == false {
 				println("Not in allowed hostnames")
 				hasRobots, _ := getRobots(hyperlink.Hostname())
 				if hasRobots == false {
