@@ -90,6 +90,13 @@ func parseRobots(text string) Robots {
 		}
 		println(lines[i])
 	}
+
+	if len(names) > 0 {
+		for _, name := range names {
+			robots.agentRules[name] = rules
+		}
+	}
+
 	return robots
 }
 

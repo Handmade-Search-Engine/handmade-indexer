@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/joho/godotenv"
@@ -55,6 +58,8 @@ func getRobots(hostname string) (bool, Robots) {
 
 	if resp.StatusCode != 200 {
 		println("Error loading page: " + resp.Status)
+		// body, _ := io.ReadAll(resp.Body)
+		// println(string(body))
 		return false, Robots{}
 	}
 
@@ -110,7 +115,29 @@ func main() {
 			panic(err)
 		}
 
+		hasRobots, robots := getRobots(currentURL.Hostname())
+		if hasRobots == false {
+			robots = Robots{}
+			robots.agentRules = make(map[string]UserAgent)
+			robots.agentRules["*"] = UserAgent{crawlDelay: 0, contentSignal: map[string]bool{"search": true}}
+		}
+
+		time.Sleep(time.Duration(robots.agentRules["*"].crawlDelay * int(time.Second)))
+
 		request := createHTTPRequest(currentURL.String())
+
+		disallowed := false
+		for i := 0; i < len(robots.agentRules["*"].disallow); i++ {
+			if strings.Contains(currentURL.String(), robots.agentRules["*"].disallow[i]) {
+				disallowed = true
+				println(robots.agentRules["*"].disallow[i] + " Is contained in " + currentURL.String())
+				break
+			}
+		}
+		if disallowed == true {
+			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			continue
+		}
 
 		resp, err := httpClient.Do(request)
 		if err != nil {
@@ -135,7 +162,6 @@ func main() {
 		}
 
 		hostname := currentURL.Hostname()
-		println(currentURL.String())
 
 		newLinks := []string{}
 		doc.Find("a").Each(func(i int, s *goquery.Selection) {
