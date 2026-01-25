@@ -5,17 +5,6 @@ import (
 	"strings"
 )
 
-func main() {
-	example := `
-User-agent: *
-Content-Signal: ai-train=no, search=yes, ai-input=no
-Allow: /
-`
-	robots := parse(example)
-	println(len(robots.agentRules))
-	println(robots.agentRules["FacebookBot"].disallow[0])
-}
-
 type UserAgent struct {
 	allow         []string
 	disallow      []string
@@ -27,7 +16,7 @@ type Robots struct {
 	sitemap    string
 }
 
-func parse(text string) Robots {
+ func parseRobots(text string) Robots {
 	lines := strings.Split(text, "\n")
 	robots := Robots{}
 	robots.agentRules = make(map[string]UserAgent)
