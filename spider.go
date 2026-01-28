@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,15 +50,16 @@ func getRobots(hostname string) (bool, Robots) {
 	}
 
 	resp, err := httpClient.Do(request)
+	if resp == nil {
+		return false, Robots{}
+	}
+
 	if err != nil {
 		panic(err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		println("Error loading page: " + resp.Status)
-		// body, _ := io.ReadAll(resp.Body)
-		// println(string(body))
 		return false, Robots{}
 	}
 
@@ -120,13 +122,18 @@ func main() {
 			panic(err)
 		}
 
+		println("\n")
+		println("Processing: " + currentURL.String())
+		println("Fetching robots.txt for: " + currentURL.Hostname())
 		hasRobots, robots := getRobots(currentURL.Hostname())
 		if hasRobots == false {
+			println(currentURL.Hostname() + " has no robots.txt file")
 			robots = Robots{}
 			robots.agentRules = make(map[string]UserAgent)
-			robots.agentRules["*"] = UserAgent{crawlDelay: 0, contentSignal: map[string]bool{"search": true}}
+			robots.agentRules["*"] = UserAgent{crawlDelay: 3, contentSignal: map[string]bool{"search": true}}
 		}
 
+		println("Waiting " + strconv.Itoa(robots.agentRules["*"].crawlDelay) + "seconds")
 		time.Sleep(time.Duration(robots.agentRules["*"].crawlDelay * int(time.Second)))
 
 		request := createHTTPRequest(currentURL.String())
@@ -135,7 +142,7 @@ func main() {
 		for i := 0; i < len(robots.agentRules["*"].disallow); i++ {
 			if strings.Contains(currentURL.String(), robots.agentRules["*"].disallow[i]) {
 				disallowed = true
-				println(robots.agentRules["*"].disallow[i] + " Is contained in " + currentURL.String())
+				println("Skipping " + currentURL.String() + " because it is disallowed in robots.txt")
 				break
 			}
 		}
@@ -145,19 +152,25 @@ func main() {
 		}
 
 		resp, err := httpClient.Do(request)
+		if resp == nil {
+			// server did not return anything meaningful (no http) and closed the connection
+			println(currentURL.String() + " closed request without a meaningful response -- skipping")
+			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
+			continue
+		}
 		if err != nil {
 			panic(err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
-			println("Error loading page: " + resp.Status)
+			println(currentURL.String() + " returned status code: " + resp.Status + " -- skipping")
 			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
 
 		if strings.Contains(resp.Header.Get("Content-Type"), "text/html") == false {
-			println("Attempting to Parse Non-Text Page -- Skipping")
+			println(currentURL.String() + " returned non-text or html -- skipping")
 			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
@@ -200,6 +213,7 @@ func main() {
 			knownURLs = append(knownURLs, knownPages[i].URL)
 		}
 
+		println(currentURL.String() + " has " + strconv.Itoa(len(newLinks)) + " hyperlinks")
 		for i := 0; i < len(newLinks); i++ {
 			hyperlink, err := url.Parse(newLinks[i])
 			if err != nil {
@@ -207,38 +221,42 @@ func main() {
 			}
 
 			if len(hyperlink.Fragment) > 0 {
-				println("Points to Fragment")
+				println("skip: " + hyperlink.String() + " is a fragment")
 				continue
 			}
 
 			if strings.HasSuffix(hyperlink.String(), ".xml") == true {
-				println("Is an XML file")
+				println("skip: " + hyperlink.String() + " is a XML file")
 				continue
 			}
 
 			if slices.Contains(bannedHostnames, hyperlink.Hostname()) == true {
-				println(hyperlink.Hostname() + " is banned")
+				println("skip: " + hyperlink.Hostname() + " is on the banned list")
 				continue
 			}
 
 			if slices.Contains(approvedHostnames, hyperlink.Hostname()) == false {
-				println("Not in allowed hostnames")
 				hasRobots, _ := getRobots(hyperlink.Hostname())
 				if hasRobots == false {
+					println("skip: " + hyperlink.Hostname() + " is not approved")
 					continue
 				}
 
+				println("skip: " + hyperlink.Hostname() + " has robots")
 				_, _, err = supabaseClient.From("has_robots").Upsert(map[string]interface{}{"hostname": hyperlink.Hostname()}, "hostname", "", "").Execute()
 				continue
 			}
+
 			if slices.Contains(stringQueue, hyperlink.String()) == true {
-				println("Already in queue")
+				println("skip: " + hyperlink.String() + " is already on the queue")
 				continue
 			}
+
 			if slices.Contains(knownURLs, hyperlink.String()) == true {
-				println("Already in found")
+				println("skip: " + hyperlink.String() + " has already been explored")
 				continue
 			}
+
 			println(hyperlink.String())
 			_, _, err = supabaseClient.From("queue").Insert(map[string]interface{}{"url": hyperlink.String()}, false, "", "", "").Execute()
 			if err != nil {

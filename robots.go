@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"strconv"
 	"strings"
 )
@@ -58,11 +59,11 @@ func parseRobots(text string) Robots {
 			continue
 		}
 		if strings.HasPrefix(strings.ToLower(lines[i]), "crawl-delay") {
-			crawlDelay, err := strconv.Atoi(extractValue(lines[i]))
+			crawlDelay, err := strconv.ParseFloat(extractValue(lines[i]), 64)
 			if err != nil {
 				panic(err)
 			}
-			rules.crawlDelay = crawlDelay
+			rules.crawlDelay = int(math.Ceil(crawlDelay))
 			continue
 		}
 		if strings.HasPrefix(strings.ToLower(lines[i]), "content-signal") {
