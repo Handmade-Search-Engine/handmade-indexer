@@ -4,6 +4,7 @@ This repo is seperated into two different services.
 
 This service is written in Go because I like Go, and it's generally more efficient than python.
 
+`robots.go` is a robots.txt parser.
 
 `indexer.py` is an indexer which reads the contents of the pages found by the spider, and indexes them based on their keywords.
 

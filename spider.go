@@ -59,7 +59,7 @@ func getRobots(hostname string) (bool, Robots) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 206 {
 		return false, Robots{}
 	}
 
