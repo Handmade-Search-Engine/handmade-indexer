@@ -105,6 +105,7 @@ func main() {
 	bannedHostnames := getURLsFromTable("banned_hostnames", supabaseClient)
 
 	httpClient := &http.Client{}
+	robotsMap := make(map[string]Robots)
 
 	for true {
 		queue := []Site{}
@@ -121,19 +122,24 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		hostname := currentURL.Hostname()
 
 		println("\n")
 		println("Processing: " + currentURL.String())
-		println("Fetching robots.txt for: " + currentURL.Hostname())
-		hasRobots, robots := getRobots(currentURL.Hostname())
-		if hasRobots == false {
-			println(currentURL.Hostname() + " has no robots.txt file")
-			robots = Robots{}
-			robots.agentRules = make(map[string]UserAgent)
-			robots.agentRules["*"] = UserAgent{crawlDelay: 3, contentSignal: map[string]bool{"search": true}}
+		robots, robotsAlreadyParsed := robotsMap[hostname]
+		if robotsAlreadyParsed == false {
+			println("Fetching robots.txt for: " + hostname)
+			hasRobots, robots := getRobots(hostname)
+			if hasRobots == false {
+				println(hostname + " has no robots.txt file")
+				robots = Robots{}
+				robots.agentRules = make(map[string]UserAgent)
+				robots.agentRules["*"] = UserAgent{crawlDelay: 3, contentSignal: map[string]bool{"search": true}}
+			}
+			robotsMap[hostname] = robots
 		}
 
-		println("Waiting " + strconv.Itoa(robots.agentRules["*"].crawlDelay) + "seconds")
+		println("Waiting " + strconv.Itoa(robots.agentRules["*"].crawlDelay) + " seconds")
 		time.Sleep(time.Duration(robots.agentRules["*"].crawlDelay * int(time.Second)))
 
 		request := createHTTPRequest(currentURL.String())
@@ -178,8 +184,6 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-
-		hostname := currentURL.Hostname()
 
 		newLinks := []string{}
 		doc.Find("a").Each(func(i int, s *goquery.Selection) {
