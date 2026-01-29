@@ -1,10 +1,15 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
+import urllib.robotparser as txtrobots
 import nltk
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
+import time
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 def get_soup(url: str) -> BeautifulSoup:
     response = requests.get(url)
@@ -39,6 +44,8 @@ supabase: Client = create_client(url, key)
 previous_hostname = ""
 previous_hostname_soup = None
 
+hostdelays = {}
+
 while True:
     queue = supabase.table('known_pages').select("*").execute().data
     if len(queue) == 0:
@@ -47,6 +54,19 @@ while True:
     url = urlparse(queue[0]['url'])
     print(len(queue), ":", url.geturl())
     hostname = url.hostname
+
+    if hostname not in hostdelays:
+        rp = txtrobots.RobotFileParser()
+        rp.set_url("https://" + hostname + "/robots.txt")
+        rp.read()
+        delay = rp.crawl_delay("*")
+        if delay:
+            hostdelays[hostname] = float(delay)
+        else:
+            hostdelays[hostname] = 3
+
+    print(f"waiting: {hostdelays[hostname]} seconds")
+    time.sleep(hostdelays[hostname])
 
     soup = get_soup(url.geturl())
     keywords = get_keywords(soup.get_text("\n"))
@@ -118,7 +138,7 @@ while True:
         for row in keyword_rows
     }
 
-    print(len(keyword_id_map.keys()))
+    print(f"found {len(keyword_id_map.keys())} keywords")
 
     posting_rows = []
     for word, positions in keywords.items():
@@ -138,4 +158,3 @@ while True:
     supabase.table('known_pages').delete().eq("url", url.geturl()).execute()
     previous_hostname = hostname
     previous_hostname_soup = hostname_soup
-    print(queue)
