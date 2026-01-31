@@ -82,7 +82,7 @@ while True:
             if title == hostname_soup.title.contents[0]:
                 header = soup.find('h1')
                 if header:
-                    title = header.contents[0]
+                    title = header.contents[0].get_text()
 
     res = (
         supabase.table("sites")
