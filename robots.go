@@ -32,6 +32,16 @@ func (userAgent *UserAgent) Copy() UserAgent {
 	return clone
 }
 
+func NewUserAgent() UserAgent {
+	agent := UserAgent{
+		crawlDelay: 3,
+	}
+	agent.contentSignal = make(map[string]bool)
+	agent.allow = make([]string, 0)
+	agent.disallow = make([]string, 0)
+	return agent
+}
+
 type Robots struct {
 	agentRules map[string]UserAgent
 	sitemap    string
@@ -42,8 +52,7 @@ func parseRobots(text string) Robots {
 	robots := Robots{}
 	robots.agentRules = make(map[string]UserAgent)
 	names := []string{}
-	rules := UserAgent{}
-	rules.contentSignal = make(map[string]bool)
+	rules := NewUserAgent()
 	for i := 0; i < len(lines); i++ {
 		if strings.HasPrefix(lines[i], "#") {
 			continue
@@ -58,7 +67,7 @@ func parseRobots(text string) Robots {
 				robots.agentRules[names[i]] = rules.Copy()
 			}
 
-			rules = UserAgent{}
+			rules = NewUserAgent()
 			names = []string{}
 			continue
 		}
