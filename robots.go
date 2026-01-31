@@ -12,6 +12,26 @@ type UserAgent struct {
 	crawlDelay    int
 	contentSignal map[string]bool
 }
+
+func (userAgent *UserAgent) Copy() UserAgent {
+	clone := UserAgent{
+		crawlDelay: userAgent.crawlDelay,
+	}
+
+	clone.allow = make([]string, len(userAgent.allow))
+	copy(clone.allow, userAgent.allow)
+
+	clone.disallow = make([]string, len(userAgent.disallow))
+	copy(clone.disallow, userAgent.disallow)
+
+	clone.contentSignal = make(map[string]bool)
+	for key, value := range userAgent.contentSignal {
+		clone.contentSignal[key] = value
+	}
+
+	return clone
+}
+
 type Robots struct {
 	agentRules map[string]UserAgent
 	sitemap    string
@@ -35,12 +55,14 @@ func parseRobots(text string) Robots {
 			}
 
 			for i := 0; i < len(names); i++ {
-				rulesCopy := rules
-				robots.agentRules[names[i]] = rulesCopy
+				robots.agentRules[names[i]] = rules.Copy()
 			}
 
 			rules = UserAgent{}
 			names = []string{}
+			continue
+		}
+		if strings.Contains(lines[i], ":") == false {
 			continue
 		}
 		if strings.HasPrefix(strings.ToLower(lines[i]), "user-agent") {
@@ -94,7 +116,7 @@ func parseRobots(text string) Robots {
 
 	if len(names) > 0 {
 		for _, name := range names {
-			robots.agentRules[name] = rules
+			robots.agentRules[name] = rules.Copy()
 		}
 	}
 
