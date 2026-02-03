@@ -37,7 +37,28 @@ func createHTTPRequest(url string) *http.Request {
 	return request
 }
 
-func getRobots(hostname string) (bool, Robots) {
+// getRobotsFromMap will return a Robots object from the robotsMap if the hostname exists
+// otherwise it fetches the robots.txt file from the hostname, and adds it to the map, and returns that.
+// if the hostname has no robots.txt file, it creates a default Robots object and returns that.
+func getRobotsFromMap(hostname string, robotsMap *map[string]Robots) Robots {
+	robots, robotsAlreadyParsed := (*robotsMap)[hostname]
+	if robotsAlreadyParsed {
+		return robots
+	}
+
+	println("Adding " + hostname + " to robots map")
+	hasRobots, robots := fetchRobots(hostname)
+	if hasRobots == false {
+		robots = Robots{defaultRobots: true}
+		robots.agentRules = make(map[string]UserAgent)
+		robots.agentRules["*"] = UserAgent{crawlDelay: 3, contentSignal: map[string]bool{"search": true}}
+	}
+	(*robotsMap)[hostname] = robots
+
+	return robots
+}
+
+func fetchRobots(hostname string) (bool, Robots) {
 	httpClient := &http.Client{}
 
 	url := "https://" + hostname + "/robots.txt"
@@ -126,19 +147,7 @@ func main() {
 
 		println("\n")
 		println("Processing: " + currentURL.String())
-		robots, robotsAlreadyParsed := robotsMap[hostname]
-		if robotsAlreadyParsed == false {
-			println("Fetching robots.txt for: " + hostname)
-			hasRobots, robots := getRobots(hostname)
-			if hasRobots == false {
-				println(hostname + " has no robots.txt file")
-				robots = Robots{}
-				robots.agentRules = make(map[string]UserAgent)
-				robots.agentRules["*"] = UserAgent{crawlDelay: 3, contentSignal: map[string]bool{"search": true}}
-			}
-			robotsMap[hostname] = robots
-		}
-
+		robots := getRobotsFromMap(hostname, &robotsMap)
 		println("Waiting " + strconv.Itoa(robots.agentRules["*"].crawlDelay) + " seconds")
 		time.Sleep(time.Duration(robots.agentRules["*"].crawlDelay * int(time.Second)))
 
@@ -240,9 +249,9 @@ func main() {
 			}
 
 			if slices.Contains(approvedHostnames, hyperlink.Hostname()) == false {
-				hasRobots, _ := getRobots(hyperlink.Hostname())
-				if hasRobots == false {
-					println("skip: " + hyperlink.Hostname() + " is not approved")
+				robots := getRobotsFromMap(hyperlink.Hostname(), &robotsMap)
+				if robots.defaultRobots == true {
+					println("skip: " + hyperlink.Hostname() + " has no robots")
 					continue
 				}
 

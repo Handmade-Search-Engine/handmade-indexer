@@ -43,13 +43,14 @@ func NewUserAgent() UserAgent {
 }
 
 type Robots struct {
-	agentRules map[string]UserAgent
-	sitemap    string
+	defaultRobots bool
+	agentRules    map[string]UserAgent
+	sitemap       string
 }
 
 func parseRobots(text string) Robots {
 	lines := strings.Split(text, "\n")
-	robots := Robots{}
+	robots := Robots{defaultRobots: false}
 	robots.agentRules = make(map[string]UserAgent)
 	names := []string{}
 	rules := NewUserAgent()
