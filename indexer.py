@@ -1,6 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, ParseResult
 import urllib.robotparser as txtrobots
 import nltk
 from supabase import create_client, Client
@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import os
 import time
 import ssl
+from typing import List, Dict, Any
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -35,11 +36,35 @@ def get_keywords(content: str):
 
     return keywords
 
+def get_page_title(url: ParseResult, page_soup, hostname_soup) -> str:
+    if not page_soup.title:
+        return ""
+    
+    title: str = page_soup.title.contents[0]
+        
+    if not hostname_soup.title:
+        return title
+    
+    if url.path == "/" or url.path == "":
+        return title
+    
+    if title != hostname_soup.title.contents[0]:
+        return title
+    
+    # page and hostname have the same title
+    header = page_soup.find('h1')
+    if not header:
+        return title
+        
+    return header.contents[0].get_text()
+
+
+
 load_dotenv()
 
-url: str = os.environ.get("SUPABASE_URL")
+SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+supabase: Client = create_client(SUPABASE_URL, key)
 
 previous_hostname = ""
 previous_hostname_soup = None
@@ -47,13 +72,15 @@ previous_hostname_soup = None
 hostdelays = {}
 
 while True:
-    queue = supabase.table('known_pages').select("*").execute().data
+    queue: List[Dict[str, str]] = supabase.table('known_pages').select("*").execute().data # type: ignore
     if len(queue) == 0:
         break
 
-    url = urlparse(queue[0]['url'])
+    url: ParseResult = urlparse(queue[0]['url'].strip('/'))
     print(len(queue), ":", url.geturl())
     hostname = url.hostname
+    if hostname == None:
+        break
 
     if hostname not in hostdelays:
         rp = txtrobots.RobotFileParser()
@@ -68,22 +95,15 @@ while True:
     print(f"waiting: {hostdelays[hostname]} seconds")
     time.sleep(hostdelays[hostname])
 
-    soup = get_soup(url.geturl())
-    keywords = get_keywords(soup.get_text("\n"))
+    page_soup = get_soup(url.geturl())
+    keywords = get_keywords(page_soup.get_text("\n"))
         
     hostname_soup = previous_hostname_soup
     if hostname != previous_hostname:
         hostname_soup = get_soup('https://'+hostname)
 
-    title = ""
-    if soup.title:
-        title = soup.title.contents[0]
-        if hostname_soup.title:
-            if title == hostname_soup.title.contents[0]:
-                header = soup.find('h1')
-                if header:
-                    title = header.contents[0].get_text()
-
+    title = get_page_title(url, page_soup, hostname_soup)
+    
     res = (
         supabase.table("sites")
            .upsert({"url": url.geturl(), "doc_length": len(keywords), "title": title}, on_conflict="url")
