@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlparse, ParseResult
 import urllib.robotparser as txtrobots
 import nltk
+from nltk.stem import *
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
@@ -25,14 +26,17 @@ def get_keywords(content: str):
 
     irrelevent_tags = ["DT", ":", "IN", "TO", "PRP", "JJ"]
 
+    stemmer = PorterStemmer()
     for i, (word, tag) in enumerate(tagged):
         if tag in irrelevent_tags:
             continue
 
-        if word in keywords:
-            keywords[word].append(i)
+        stem = stemmer.stem(word)
+
+        if stem in keywords:
+            keywords[stem].append(i)
         else:
-            keywords[word] = [i]
+            keywords[stem] = [i]
 
     return keywords
 
