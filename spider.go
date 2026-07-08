@@ -199,7 +199,11 @@ func main() {
 			hyperlink, exists := s.Attr("href")
 			if exists == false {
 				return
-			} else if strings.HasPrefix(hyperlink, "https://") {
+			}
+
+			hyperlink, _ = strings.CutSuffix(hyperlink, "/")
+
+			if strings.HasPrefix(hyperlink, "https://") || strings.HasPrefix(hyperlink, "http://") {
 				newLinks = append(newLinks, hyperlink)
 			} else if strings.HasPrefix(hyperlink, "/") {
 				newLinks = append(newLinks, "https://"+hostname+hyperlink)
@@ -277,7 +281,8 @@ func main() {
 			}
 		}
 
-		_, _, err = supabaseClient.From("known_pages").Insert(map[string]interface{}{"url": currentURL.String()}, false, "", "", "").Execute()
+		strippedURLString, _ := strings.CutSuffix(currentURL.String(), "/")
+		_, _, err = supabaseClient.From("known_pages").Upsert(map[string]interface{}{"url": strippedURLString}, "url", "", "").Execute()
 		if err != nil {
 			panic(err)
 		}
