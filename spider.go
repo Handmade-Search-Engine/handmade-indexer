@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -139,6 +140,9 @@ func main() {
 			break
 		}
 
+		sort.Slice(queue[:], func(i, j int) bool {
+			return queue[i].ID < queue[j].ID
+		})
 		currentURL, err := url.Parse(queue[0].URL)
 		if err != nil {
 			panic(err)
@@ -146,6 +150,7 @@ func main() {
 		hostname := currentURL.Hostname()
 
 		println("\n")
+		println(queue[0].ID)
 		println("Processing: " + currentURL.String())
 		robots := getRobotsFromMap(hostname, &robotsMap)
 		println("Waiting " + strconv.Itoa(robots.agentRules["*"].crawlDelay) + " seconds")
