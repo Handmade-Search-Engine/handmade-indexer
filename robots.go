@@ -82,6 +82,10 @@ func parseRobots(text string) Robots {
 		}
 		if strings.HasPrefix(strings.ToLower(lines[i]), "disallow") {
 			location := extractValue(lines[i])
+			if len(location) == 0 {
+				// empty string
+				continue
+			}
 			rules.disallow = append(rules.disallow, location)
 			continue
 		}
@@ -93,7 +97,8 @@ func parseRobots(text string) Robots {
 		if strings.HasPrefix(strings.ToLower(lines[i]), "crawl-delay") {
 			crawlDelay, err := strconv.ParseFloat(extractValue(lines[i]), 64)
 			if err != nil {
-				panic(err)
+				println(err)
+				continue
 			}
 			rules.crawlDelay = int(math.Ceil(crawlDelay))
 			continue

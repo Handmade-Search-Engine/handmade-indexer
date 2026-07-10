@@ -129,7 +129,7 @@ while True:
         row["keyword"]: row
         for row in existing_keywords
     }
-
+    new_keywords = 0
     keyword_upserts = []
     for word in words:
         if word in existing_map:
@@ -138,6 +138,7 @@ while True:
                 "document_frequency": existing_map[word]['document_frequency'] + 1
             })
         else:
+            new_keywords += 1
             keyword_upserts.append({
                 "keyword": word,
                 "document_frequency": 1
@@ -162,7 +163,7 @@ while True:
         for row in keyword_rows
     }
 
-    print(f"found {len(keyword_id_map.keys())} keywords")
+    print(f"found {new_keywords} new keywords and {len(keyword_id_map.keys()) - new_keywords} existing")
 
     posting_rows = []
     for word, positions in keywords.items():

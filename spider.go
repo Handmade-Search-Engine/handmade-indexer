@@ -149,7 +149,7 @@ func main() {
 		println("Processing: " + currentURL.String())
 		robots := getRobotsFromMap(hostname, &robotsMap)
 		println("Waiting " + strconv.Itoa(robots.agentRules["*"].crawlDelay) + " seconds")
-		time.Sleep(time.Duration(robots.agentRules["*"].crawlDelay * int(time.Second)))
+		time.Sleep(time.Duration(max(robots.agentRules["*"].crawlDelay, 3) * int(time.Second)))
 
 		request := createHTTPRequest(currentURL.String())
 
