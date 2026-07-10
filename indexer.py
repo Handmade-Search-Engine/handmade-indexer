@@ -107,10 +107,20 @@ while True:
         hostname_soup = get_soup('https://'+hostname)
 
     title = get_page_title(url, page_soup, hostname_soup)
+
+    description = ""
+    if url.path == "" or url.path == "/":
+        description_tag = page_soup.find('meta', {'name': 'description'})
+        if description_tag:
+            description = description_tag.get('content')
+        else:
+            first_paragraph = page_soup.p
+            if first_paragraph:
+                description = first_paragraph.text
     
     res = (
         supabase.table("sites")
-           .upsert({"url": url.geturl(), "doc_length": len(keywords), "title": title}, on_conflict="url")
+           .upsert({"url": url.geturl(), "doc_length": len(keywords), "title": title, "description": description}, on_conflict="url")
            .execute()
         )
     site_id = res.data[0]['site_id']
