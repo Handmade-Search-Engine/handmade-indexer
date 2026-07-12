@@ -28,7 +28,7 @@ while True:
 
     print(len(queue), ":", f"https://{hostname}")
     print(f"https://{hostname}/robots.txt")
-    choice = input("Options:\n[d] Delete\n[a] Add to queue\n[s] Skip\n")
+    choice = input("Options:\n[d] Ban hostname\n[a] Add to queue\n[s] Skip\n[c] Add to Crawl Only\n")
 
     if choice == 'a':
         (
@@ -39,6 +39,12 @@ while True:
         (
         supabase.table("approved_hostnames")
            .upsert({"url": f'{hostname}'}, on_conflict="url")
+           .execute()
+        )
+    elif choice == "c":
+        (
+        supabase.table("crawl_only")
+           .upsert({"hostname": f'{hostname}'}, on_conflict="hostname")
            .execute()
         )
     elif choice == "s":

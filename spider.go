@@ -128,6 +128,7 @@ func main() {
 
 	httpClient := &http.Client{}
 	robotsMap := make(map[string]Robots)
+	defunctURLS := []string{}
 
 	for true {
 		queue := []Site{}
@@ -175,6 +176,7 @@ func main() {
 		if resp == nil {
 			// server did not return anything meaningful (no http) and closed the connection
 			println(currentURL.String() + " closed request without a meaningful response -- skipping")
+			defunctURLS = append(defunctURLS, currentURL.String())
 			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
@@ -185,12 +187,14 @@ func main() {
 
 		if resp.StatusCode != 200 {
 			println(currentURL.String() + " returned status code: " + resp.Status + " -- skipping")
+			defunctURLS = append(defunctURLS, currentURL.String())
 			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
 
 		if strings.Contains(resp.Header.Get("Content-Type"), "text/html") == false {
 			println(currentURL.String() + " returned non-text or html -- skipping")
+			defunctURLS = append(defunctURLS, currentURL.String())
 			_, _, err = supabaseClient.From("queue").Delete("", "").Eq("url", currentURL.String()).Execute()
 			continue
 		}
@@ -254,6 +258,11 @@ func main() {
 
 			if slices.Contains(bannedHostnames, hyperlink.Hostname()) == true {
 				println("skip: " + hyperlink.Hostname() + " is on the banned list")
+				continue
+			}
+
+			if slices.Contains(defunctURLS, hyperlink.String()) == true {
+				println("skip: " + hyperlink.String() + " is defunct")
 				continue
 			}
 
