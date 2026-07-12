@@ -77,7 +77,7 @@ func fetchRobots(hostname string) (bool, Robots) {
 	}
 
 	if err != nil {
-		panic(err)
+		return false, Robots{}
 	}
 	defer resp.Body.Close()
 
