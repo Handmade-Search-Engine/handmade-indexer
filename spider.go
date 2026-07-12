@@ -228,6 +228,9 @@ func main() {
 
 		knownPages := []Site{}
 		if len(newLinks) > 0 {
+			slices.Sort(newLinks)
+			newLinks = slices.Compact(newLinks)
+
 			_, err := supabaseClient.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
 			if err != nil {
 				panic(err)
