@@ -236,11 +236,21 @@ func main() {
 			json.Unmarshal([]byte(result), &knownURLs)
 		}
 
+		/* COMMENT OUT THIS SECTION TO RE-INDEX SITES */
+		knownSiteURLS := []string{}
+		result = supabaseClient.Rpc("get_already_indexed_sites", "", map[string]any{"urls": newLinks})
+		if result != "null" {
+			json.Unmarshal([]byte(result), &knownSiteURLS)
+			knownURLs = slices.Concat(knownURLs, knownSiteURLS)
+		}
+		/* END OF SECTION */
+
 		println(currentURL.String() + " has " + strconv.Itoa(len(newLinks)) + " hyperlinks")
 		for i := 0; i < len(newLinks); i++ {
 			hyperlink, err := url.Parse(newLinks[i])
 			if err != nil {
-				panic(err)
+				println("skip: " + newLinks[i] + " could not be parsed")
+				continue
 			}
 
 			if len(hyperlink.Fragment) > 0 {
