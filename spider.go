@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -226,20 +227,13 @@ func main() {
 			stringQueue = append(stringQueue, queue[i].URL)
 		}
 
-		knownPages := []Site{}
-		if len(newLinks) > 0 {
-			slices.Sort(newLinks)
-			newLinks = slices.Compact(newLinks)
-
-			_, err := supabaseClient.From("known_pages").Select("url", "", false).In("url", newLinks).ExecuteTo(&knownPages)
-			if err != nil {
-				panic(err)
-			}
-		}
-
 		knownURLs := []string{}
-		for i := 0; i < len(knownPages); i++ {
-			knownURLs = append(knownURLs, knownPages[i].URL)
+		slices.Sort(newLinks)
+		newLinks = slices.Compact(newLinks)
+
+		result := supabaseClient.Rpc("get_known_urls", "", map[string]any{"urls": newLinks})
+		if result != "null" {
+			json.Unmarshal([]byte(result), &knownURLs)
 		}
 
 		println(currentURL.String() + " has " + strconv.Itoa(len(newLinks)) + " hyperlinks")
