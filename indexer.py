@@ -2,6 +2,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, ParseResult
 import urllib.robotparser as txtrobots
+from urllib3.exceptions import ProtocolError
+from requests.exceptions import ConnectionError
 import nltk
 from nltk.stem import *
 from supabase import create_client, Client
@@ -9,12 +11,17 @@ from dotenv import load_dotenv
 import os
 import time
 import ssl
+from datetime import datetime
 from typing import List, Dict, Any
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
 def get_soup(url: str) -> BeautifulSoup:
-    response = requests.get(url)
+    try:
+        response = requests.get(url)
+    except Exception as e:
+        print(e)
+        raise e
     soup = BeautifulSoup(response.text, 'html.parser')
     return soup
 
@@ -44,6 +51,9 @@ def get_page_title(url: ParseResult, page_soup, hostname_soup) -> str:
     if not page_soup.title:
         return ""
     
+    if len(page_soup.title.contents) == 0:
+        return ""
+
     title: str = page_soup.title.contents[0]
         
     if not hostname_soup.title:
@@ -80,26 +90,47 @@ while True:
     if len(queue) == 0:
         break
 
-    url: ParseResult = urlparse(queue[0]['url'].strip('/'))
-    print(len(queue), ":", url.geturl())
-    hostname = url.hostname
-    if hostname == None:
-        break
+    i = 0
+    while True:
+        url: ParseResult = urlparse(queue[i]['url'].strip('/'))
+        hostname = url.hostname
+        if hostname == None:
+            quit()
+        
+        if i > len(queue):
+            break
 
-    if hostname not in hostdelays:
-        rp = txtrobots.RobotFileParser()
-        rp.set_url("https://" + hostname + "/robots.txt")
-        rp.read()
-        delay = rp.crawl_delay("*")
-        if delay:
-            hostdelays[hostname] = float(delay)
+        if hostname in hostdelays:
+            delay = hostdelays[hostname]['delay']
+            last_crawl = hostdelays[hostname]['last_crawl']
+            seconds = (datetime.now() - last_crawl).total_seconds()
+            if seconds > delay:
+                print(f"{hostname}: {seconds}s > {delay}s")
+                break
         else:
-            hostdelays[hostname] = 3
+            rp = txtrobots.RobotFileParser()
+            rp.set_url("https://" + hostname + "/robots.txt")
+            rp.read()
+            delay = rp.crawl_delay("*")
+            if delay:
+                hostdelays[hostname] = {"delay": float(delay), "last_crawl": datetime.now()}
+                break
+            else:
+                hostdelays[hostname] = {"delay":3, "last_crawl": datetime.now()}
+                break
 
-    print(f"waiting: {hostdelays[hostname]} seconds")
-    time.sleep(hostdelays[hostname])
+        i += 1
 
-    page_soup = get_soup(url.geturl())
+    print(len(queue), ":", url.geturl())
+    hostdelays[hostname]['last_crawl'] = datetime.now()
+
+    try:
+        page_soup = get_soup(url.geturl())
+    except (ProtocolError, ConnectionError) as e:
+        print(f"Could not fetch {url.geturl()} due to {e}")
+        supabase.table('known_pages').delete().eq("url", url.geturl()).execute()
+        continue
+
     keywords = get_keywords(page_soup.get_text("\n"))
         
     hostname_soup = previous_hostname_soup
@@ -154,6 +185,11 @@ while True:
                 "document_frequency": 1
             })
 
+
+    if len(keyword_upserts) == 0:
+        print(f"{url.geturl()} has no keywords")
+        supabase.table('known_pages').delete().eq("url", url.geturl()).execute()
+        continue
 
     supabase.table('keywords').upsert(
         keyword_upserts,

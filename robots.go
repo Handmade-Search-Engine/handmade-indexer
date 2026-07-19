@@ -109,6 +109,11 @@ func parseRobots(text string) Robots {
 			for i := 0; i < len(signals); i++ {
 				signal := strings.TrimSpace(signals[i])
 				result := strings.SplitN(signal, "=", 2)
+
+				if len(result) <= 1 {
+					continue
+				}
+
 				signalName := result[0]
 
 				signalValueString := result[1]
